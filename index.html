@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
 <head>
@@ -20,6 +21,9 @@
     <!-- Driver.js for Onboarding Tour -->
     <script src="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css"/>
+
+    <!-- Jitsi Meet API for Video Calls -->
+    <script src='https://meet.jit.si/external_api.js'></script>
 
     <!-- Custom Config for Tailwind -->
     <script>
@@ -139,16 +143,53 @@
         </div>
     </div>
 
-    <!-- TELEMEDICINE MODAL -->
+    <!-- UPDATED: TELEMEDICINE MODAL (UI FIX) -->
     <div id="telemedModal" class="fixed inset-0 z-[90] modal-overlay hidden flex items-center justify-center p-4">
-        <div class="bg-black relative max-w-4xl w-full rounded-2xl overflow-hidden shadow-2xl aspect-video border border-gray-800">
-            <video id="localVideo" autoplay playsinline muted class="w-full h-full object-cover transform scale-x-[-1]"></video>
-            <div class="absolute bottom-6 left-0 right-0 flex justify-center gap-6">
-                <button onclick="toggleTelemed(false)" class="w-14 h-14 bg-red-600 rounded-full text-white flex items-center justify-center hover:bg-red-700 transition shadow-lg"><i class="fa-solid fa-phone-slash text-xl"></i></button>
-                <button class="w-14 h-14 bg-gray-700/80 rounded-full text-white flex items-center justify-center hover:bg-gray-600 transition backdrop-blur"><i class="fa-solid fa-microphone-slash"></i></button>
+        <!-- Changed h-[80vh] to h-auto max-h-[90vh] to allow fitting content better -->
+        <div class="bg-white dark:bg-darkcard max-w-5xl w-full rounded-2xl overflow-hidden shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col h-[85vh]">
+            
+            <!-- Header -->
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-slate-800 flex-shrink-0">
+                <h3 class="font-bold text-lg"><i class="fa-solid fa-video text-indigo-500 mr-2"></i> Telemed Consultation</h3>
+                <button onclick="toggleTelemed(false)" class="text-gray-500 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-xl"></i></button>
             </div>
-            <div class="absolute top-4 left-4 bg-red-600/90 text-white px-3 py-1 rounded-full text-xs animate-pulse">
-                <i class="fa-solid fa-circle text-[10px] mr-1"></i> DEMO MODE
+
+            <!-- Lobby View (Added overflow-y-auto to fix clipping) -->
+            <div id="telemedLobby" class="flex-1 flex flex-col items-center justify-center p-4 text-center space-y-4 overflow-y-auto">
+                <div class="w-16 h-16 bg-indigo-100 dark:bg-indigo-900 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-300">
+                    <i class="fa-solid fa-user-doctor text-3xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold">Start Video Session</h2>
+                <p class="text-gray-500 dark:text-gray-400 max-w-md text-sm">Enter a unique code to join an existing consultation, or create a new one to invite a patient/doctor.</p>
+                
+                <div class="w-full max-w-sm space-y-3 pt-2">
+                    <div class="text-left">
+                        <label class="text-xs font-bold text-gray-500 ml-1">Display Name</label>
+                        <input type="text" id="teleName" placeholder="e.g. Dr. Smith / John Doe" class="w-full p-3 border rounded-lg dark:bg-slate-800 dark:border-gray-600 outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    
+                    <div class="relative text-left">
+                        <label class="text-xs font-bold text-gray-500 ml-1">Room Code</label>
+                        <div class="relative">
+                            <input type="text" id="teleRoomCode" placeholder="e.g. HV8S9S" class="w-full p-3 border rounded-lg dark:bg-slate-800 dark:border-gray-600 outline-none focus:ring-2 focus:ring-indigo-500 font-mono tracking-widest text-center uppercase text-lg">
+                            <button onclick="generateRoomCode()" class="absolute right-2 top-2 text-xs bg-gray-200 dark:bg-gray-700 px-3 py-2 rounded hover:bg-gray-300 transition font-bold" title="Generate Random Code">Gen</button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 pt-4 pb-2">
+                        <button onclick="startVideoCall('join')" class="py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-lg transition transform hover:scale-105">
+                            <i class="fa-solid fa-right-to-bracket mr-2"></i> Join
+                        </button>
+                        <button onclick="startVideoCall('create')" class="py-3 bg-white dark:bg-slate-700 border border-indigo-200 dark:border-gray-600 text-indigo-600 dark:text-indigo-300 rounded-lg font-bold hover:bg-indigo-50 dark:hover:bg-gray-600 transition">
+                            <i class="fa-solid fa-plus mr-2"></i> Create
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Video Container (Jitsi loads here) -->
+            <div id="telemedVideoArea" class="hidden flex-1 w-full bg-black relative">
+                <div id="jitsi-container" class="w-full h-full"></div>
             </div>
         </div>
     </div>
@@ -339,8 +380,6 @@
         </div>
     </section>
 
-    <!-- (Removed Gamification/Quiz Section as requested) -->
-
     <!-- Tools Grid -->
     <section id="tools" class="py-16 bg-white dark:bg-slate-900">
         <div class="max-w-7xl mx-auto px-4">
@@ -491,8 +530,8 @@
                 
                 <!-- NEW: Telemedicine Lite -->
                 <div class="bg-white dark:bg-darkcard p-6 rounded-xl shadow-lg border-t-4 border-indigo-500 hover:shadow-2xl transition group relative overflow-hidden">
-                    <h3 class="text-xl font-bold mb-4 flex items-center"><i class="fa-solid fa-video text-indigo-500 mr-2"></i> Telemed Demo</h3>
-                    <p class="text-xs text-gray-500 mb-4">Simulate a remote consultation environment.</p>
+                    <h3 class="text-xl font-bold mb-4 flex items-center"><i class="fa-solid fa-video text-indigo-500 mr-2"></i> Telemed Consult</h3>
+                    <p class="text-xs text-gray-500 mb-4">Connect remotely with patients or doctors safely.</p>
                     <button onclick="toggleTelemed(true)" class="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 transition">Start Video Call</button>
                 </div>
 
@@ -610,18 +649,18 @@
 
         if(localStorage.getItem('theme') === 'dark') html.classList.add('dark');
 
-        // --- 1. VOICE RECOGNITION FIX & TTS ---
+        // --- 1. VOICE RECOGNITION & TTS ---
         const voiceBtn = document.getElementById('voiceBtn');
         const userInput = document.getElementById('userInput');
         let currentLang = 'en-US';
-        let isTtsEnabled = true; // NEW: Voice toggle state
+        let isTtsEnabled = true;
 
         function changeLanguage() {
             const val = document.getElementById('langSelect').value;
             currentLang = val === 'hi' ? 'hi-IN' : (val === 'te' ? 'te-IN' : 'en-US');
         }
 
-        // NEW: Toggle Voice Function
+        // Toggle Voice Function
         function toggleVoice() {
             isTtsEnabled = !isTtsEnabled;
             const btn = document.getElementById('voiceToggleBtn');
@@ -665,9 +704,8 @@
             voiceBtn.style.display = 'none';
         }
 
-        // UPDATED: speakResponse to interrupt previous speech and check toggle
         function speakResponse(text) {
-            window.speechSynthesis.cancel(); // Always cancel previous speech
+            window.speechSynthesis.cancel();
             if('speechSynthesis' in window && isTtsEnabled) {
                 const utterance = new SpeechSynthesisUtterance(text.replace(/<[^>]*>/g, ''));
                 utterance.lang = currentLang;
@@ -675,19 +713,18 @@
             }
         }
 
-        // --- 2. AI DIAGNOSIS LOGIC (With Safety & Multilingual) ---
+        // --- 2. AI DIAGNOSIS LOGIC ---
         const chatContainer = document.getElementById('chatContainer');
         const typingIndicator = document.getElementById('typingIndicator');
         const ageInput = document.getElementById('userAge');
         
-        // Offline Queue
         let msgQueue = JSON.parse(localStorage.getItem('offlineQueue') || '[]');
 
         window.addEventListener('online', () => {
             document.getElementById('offlineIndicator').classList.add('hidden');
             if(msgQueue.length > 0) {
                 alert("Back online! Sending queued messages...");
-                msgQueue = []; // In real app, retry logic goes here
+                msgQueue = [];
                 localStorage.setItem('offlineQueue', '[]');
             }
         });
@@ -695,7 +732,6 @@
             document.getElementById('offlineIndicator').classList.remove('hidden');
         });
 
-        // Medicine Checker (Basic)
         const medContraindications = {
             "aspirin": ["ulcer", "bleeding", "asthma"],
             "ibuprofen": ["kidney", "ulcer"],
@@ -717,7 +753,6 @@
         }
 
         async function sendMessage() {
-            // STOP old speech when sending new message
             window.speechSynthesis.cancel();
 
             const text = userInput.value.trim();
@@ -727,7 +762,6 @@
             if (!text) { alert("Please enter symptoms."); return; }
             if (!age) { alert("Please enter your age first."); ageInput.focus(); return; }
 
-            // Safety Filter
             const badWords = ["kill", "suicide", "bomb", "weapon"];
             if(badWords.some(w => text.toLowerCase().includes(w))) {
                 addMessage("I cannot assist with that request. Please call emergency services.", 'ai');
@@ -766,10 +800,8 @@
                 const aiText = data.choices?.[0]?.message?.content || "I couldn't process that.";
                 let formattedText = aiText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
                 
-                // Add Interaction Warnings
                 formattedText += checkInteractions(formattedText, text);
                 
-                // Visual Triage
                 let triageClass = "";
                 if(aiText.toLowerCase().includes("urgent") || aiText.toLowerCase().includes("emergency")) triageClass = "triage-high";
                 else if(aiText.toLowerCase().includes("consult doctor")) triageClass = "triage-med";
@@ -778,7 +810,6 @@
                 addMessage(formattedText, 'ai', triageClass);
                 speakResponse(aiText);
 
-                // Update Metrics
                 let count = parseInt(document.getElementById('reqCount').innerText.replace(',','')) + 1;
                 document.getElementById('reqCount').innerText = count.toLocaleString();
 
@@ -791,7 +822,6 @@
 
         function addMessage(text, sender, extraClass = "") {
             const div = document.createElement('div');
-            // Encryption simulation
             if(sender === 'user' && isEncrypted) {
                 text = "<i class='fa-solid fa-lock text-xs'></i> " + text;
             }
@@ -801,7 +831,7 @@
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
-        // --- 3. NEW: AI MEDICAL ANALYZER (VISION) - FIXED MODEL ID ---
+        // --- 3. AI MEDICAL ANALYZER (VISION) ---
         let currentMedMode = 'injury';
 
         function setMedicalAnalyzerMode(mode) {
@@ -820,7 +850,6 @@
             }
         }
 
-        // Handle File Input UI
         document.getElementById('medImageInput').addEventListener('change', function(e) {
             if (e.target.files[0]) {
                 document.getElementById('medFileName').innerText = e.target.files[0].name;
@@ -867,7 +896,6 @@
                                     ]
                                 }
                             ],
-                            // ** CRITICAL FIX: Updated to 17b-vision-preview **
                             model: "meta-llama/llama-4-scout-17b-16e-instruct" 
                         })
                     });
@@ -953,7 +981,7 @@
             }
         }
 
-        // --- 5. NEW: BMI CALCULATOR ---
+        // --- 5. BMI CALCULATOR ---
         function calculateBMI() {
             const weight = parseFloat(document.getElementById('bmiWeight').value);
             const height = parseFloat(document.getElementById('bmiHeight').value) / 100; // cm to m
@@ -992,7 +1020,7 @@
             resultDiv.classList.remove('hidden');
         }
 
-        // --- 6. NEW: MENTAL WELLNESS AI (The 6th Item) ---
+        // --- 6. MENTAL WELLNESS AI ---
         async function checkMentalHealth() {
             const input = document.getElementById('mentalInput').value;
             const output = document.getElementById('mentalResult');
@@ -1134,19 +1162,88 @@
             }
         }
 
-        // --- 10. TELEMEDICINE LITE ---
+        // --- 10. TELEMEDICINE (JITSI INTEGRATION) ---
+        let jitsiApi = null;
+
         function toggleTelemed(show) {
             const modal = document.getElementById('telemedModal');
-            const video = document.getElementById('localVideo');
-            if(show) {
+            const lobby = document.getElementById('telemedLobby');
+            const videoArea = document.getElementById('telemedVideoArea');
+            
+            if (show) {
                 modal.classList.remove('hidden');
-                navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-                    .then(stream => video.srcObject = stream)
-                    .catch(err => alert("Camera permission denied"));
+                // Reset to lobby
+                lobby.classList.remove('hidden');
+                videoArea.classList.add('hidden');
             } else {
                 modal.classList.add('hidden');
-                if(video.srcObject) video.srcObject.getTracks().forEach(track => track.stop());
+                // Hangup if active
+                if (jitsiApi) {
+                    jitsiApi.dispose();
+                    jitsiApi = null;
+                }
+                document.getElementById('jitsi-container').innerHTML = "";
             }
+        }
+
+        function generateRoomCode() {
+            // Generate a random 6-character code
+            const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+            document.getElementById('teleRoomCode').value = code;
+        }
+
+        function startVideoCall(mode) {
+            const name = document.getElementById('teleName').value.trim();
+            let code = document.getElementById('teleRoomCode').value.trim().toUpperCase();
+
+            if (!name) return alert("Please enter your name.");
+            
+            if (mode === 'create' && !code) {
+                // If creating and no code, generate one
+                generateRoomCode();
+                code = document.getElementById('teleRoomCode').value;
+            }
+            
+            if (!code) return alert("Please enter a Room Code.");
+
+            // Switch UI
+            document.getElementById('telemedLobby').classList.add('hidden');
+            document.getElementById('telemedVideoArea').classList.remove('hidden');
+
+            // Initialize Jitsi Meet
+            const domain = 'meet.jit.si';
+            const options = {
+                roomName: 'HealthAssistAI_' + code, // Prefix ensures unique namespace
+                width: '100%',
+                height: '100%',
+                parentNode: document.querySelector('#jitsi-container'),
+                userInfo: {
+                    displayName: name
+                },
+                configOverwrite: { 
+                    startWithAudioMuted: false, 
+                    startWithVideoMuted: false,
+                    prejoinPageEnabled: false // Skip Jitsi prejoin screen
+                },
+                interfaceConfigOverwrite: {
+                    TOOLBAR_BUTTONS: [
+                        'microphone', 'camera', 'closedcaptions', 'desktop', 'fullscreen',
+                        'fodeviceselection', 'hangup', 'profile', 'chat', 'recording',
+                        'livestreaming', 'etherpad', 'sharedvideo', 'settings', 'raisehand',
+                        'videoquality', 'filmstrip', 'invite', 'feedback', 'stats', 'shortcuts',
+                        'tileview', 'videobackgroundblur', 'download', 'help', 'mute-everyone'
+                    ],
+                }
+            };
+
+            jitsiApi = new JitsiMeetExternalAPI(domain, options);
+
+            // Handle Hangup Event
+            jitsiApi.addEventListeners({
+                videoConferenceLeft: function () {
+                    toggleTelemed(false);
+                }
+            });
         }
 
         // --- 11. DOWNLOAD CHAT ---
